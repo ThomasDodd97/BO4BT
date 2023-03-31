@@ -78,7 +78,7 @@ def FiveDimensionStoichConv_func(chem_lis,bdims_lis):
     c_x_lis = []
     c_y_lis = []
     b2_actual_lis = []
-    for b1_sca,b2_sca in zip(bdims_lis[5],bdims_lis[6]):
+    for b1_sca,b2_sca in zip(bdims_lis[3],bdims_lis[4]):
         c_x_lis.append((np.cos((60/360)*(2*np.pi))) * b1_sca)
         c_y_lis.append((np.sin((60/360)*(2*np.pi))) * b1_sca)
         b2_actual_lis.append(b2_sca * b1_sca)

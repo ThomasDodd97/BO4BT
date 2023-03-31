@@ -156,7 +156,7 @@ def QuasirandomSampler1D_func(NoSD_sca,dims_li):
         high_sca = high_sca + step_sca
         i += 1
 
-    s1_arr = PointsIn_arr
+    s1_arr = np.array(PointsIn_arr)
 
     return s1_arr
 
@@ -333,10 +333,10 @@ def QuasirandomSampler3D_func(NoSD_sca,dims_li):
         c_high_x1_sca = c_high_x1_sca + step_x1_sca
         i += 1
     
-    s1_arr = s1PointsIn_arr
-    s2_arr = s2PointsIn_arr
-    x1_arr = x1PointsIn_arr
-    b1_arr = x1_arr
+    s1_arr = np.array(s1PointsIn_arr)
+    s2_arr = np.array(s2PointsIn_arr)
+    x1_arr = np.array(x1PointsIn_arr)
+    b1_arr = np.array(x1_arr)
 
     return s1_arr,s2_arr,x1_arr,b1_arr
 
@@ -728,11 +728,11 @@ def QuasirandomSampler5D_func(NoSD_sca,dims_li):
         if NoPI2DT_sca == NoSD_sca and NoPI3DC_sca == NoSD_sca:
             break
 
-    s1_arr = s1PointsIn_arr
-    s2_arr = s2PointsIn_arr
-    s3_arr = s3PointsIn_arr
-    x1_arr = x1PointsIn_arr
-    y1_arr = y1PointsIn_arr
+    s1_arr = np.array(s1PointsIn_arr)
+    s2_arr = np.array(s2PointsIn_arr)
+    s3_arr = np.array(s3PointsIn_arr)
+    x1_arr = np.array(x1PointsIn_arr)
+    y1_arr = np.array(y1PointsIn_arr)
 
     b1_arr,b2_arr = BalancePointFinder2DTri_func(x1_arr,y1_arr)
 
