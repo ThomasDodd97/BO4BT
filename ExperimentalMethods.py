@@ -90,8 +90,6 @@ def InitCsv_func(chem_lis,dims_lis):
     Stykke3Columns_lis.append("exp_param_b")
     Stykke3Columns_lis.append("exp_param_c")
     Stykke3Columns_lis.append("time_elapsed_hours")
-    Stykke3Columns_lis.append("estimated_halflife_hours")
-    Stykke3Columns_lis.append("time_elapsed_halflives")
     Stykke3Columns_lis.append("lin_param_m")
     Stykke3Columns_lis.append("lin_param_c")
     # Stykke 4 csv headings generator
@@ -106,9 +104,9 @@ def InitCsv_func(chem_lis,dims_lis):
             b_count += 1
     for chem_obj in chem_lis:
         Stykke4Columns_lis.append(chem_obj.abbrev_name + "_stoichiometry")
-    Stykke4Columns_lis.append("polymer_start_mass_g")
-    Stykke4Columns_lis.append("polymer_end_mass_pct")
-    Stykke4Columns_lis.append("delta_polymer_mass_pct")
+    Stykke4Columns_lis.append("StartPolymerMass_g")
+    Stykke4Columns_lis.append("EndPolymerMass_pct")
+    Stykke4Columns_lis.append("DeltaPolymerMass_pct")
     # Stykke columns appended together into a list
     StykkeColumns_lis = [Stykke1Columns_lis,Stykke2Columns_lis,Stykke3Columns_lis,Stykke4Columns_lis]
 
@@ -266,13 +264,13 @@ def StykkeOneSave_func(CsvPaths_lis,MPs_lis,ToPP_lis,chem_lis,dims_lis,bdims_lis
     their respective places.
 
     This function takes:
-        CsvPaths_lis
+        CsvPaths_lis = list, all the absolute paths for the data files
         MPs_lis = list, mould positions
         ToPP_lis = list, time at which prepolymer was added to each mould position x
         chem_lis = list, the chemicals objects that are being considered
-        dims_lis = list
-        bdims_lis = list
-        sr_lis = list
+        dims_lis = list, all the dimensional objects in a list
+        bdims_lis = list, all the bayesian dimensional arrays in a list
+        sr_lis = list, all the stoichiometric arrays in a list
         MoSMs_lis = list, mass of silicone moulds at position x
         MoSMPP_lis = list, mass of silicone mould and prepolymer contents at x
         MoPP_lis = list, mass of prepolymer at mould position x
@@ -324,11 +322,475 @@ def StykkeOneSave_func(CsvPaths_lis,MPs_lis,ToPP_lis,chem_lis,dims_lis,bdims_lis
         df2.to_csv(CSVPath2_str, index=False)
         i+=1
 
+def StykkeTwoRunSave_func(CsvPaths_lis):
+    """
+    This function is the main script for a simple program which updates the stykke-2 csv dataframe with the latest
+    masses of the ice cube tray, so that changes in mass can be plotted against time since start of experiment.
+
+    This function takes two variables:
+        CsvPaths_lis = list, a set of CSV strings with absolute paths for all the datasets
+    """
+    # Importing the modules required
+    import numpy as np
+    import pandas as pd
+    from datetime import datetime
+    import os
+    ScriptPath_str = os.getcwd()
+    os.chdir("/Users/thomasdodd/Library/CloudStorage/OneDrive-MillfieldEnterprisesLimited/github/BO4BT")
+    from Miscellaneous import query
+    os.chdir(ScriptPath_str)
+
+    q_obj = query()
+
+    df2 = pd.read_csv(CsvPaths_lis[1])
+    df4 = pd.read_csv(CsvPaths_lis[3])
+
+    old_moulds = list(set(df4["mould_position"]))
+    all_moulds = list(set(df2["mould_position"]))
+    current_moulds = [x for x in all_moulds if x not in old_moulds]
+
+    df1 = pd.read_csv(CsvPaths_lis[0])
+    for _ in old_moulds:
+        df1 = df1[df1["mould_position"].str.contains(_)==False]
+
+    # Looping over each of the moulds to be checked on
+    for _,__ in zip(df1["mould_position"],df1["MouldMass_g"]):
+        # Obtain permission to gather the next point
+        ans = q_obj.string(f"Mass available for silicone mould {_} and its prepolymer contents? (y/n)", "y", "n")
+        if ans == "y":
+            # Obtaining the user input with respect to mass of silicone ice cube tray and its contents in grams
+            val = q_obj.numeric(f"\tWhat is the current mass of silicone mould {_} and its prepolymer contents? (x.xx g)")
+            # Read in version so far of the dataframe
+            df2 = pd.read_csv(CsvPaths_lis[1])
+            # Obtaining the current unformatted time
+            UFTime = datetime.now()
+            # Format for the time
+            TFormat = "%Y-%m-%d %H:%M:%S"
+            # Formatting time
+            FTime = UFTime.strftime(TFormat)
+            # Placing the newfound information into the dataframe we are dealing with
+            df2.loc[-1] = [_, FTime, __, val, round((val-__),2)]
+            # Saving the dataframe as a CSV overwriting the original CSV read in.
+            df2.to_csv(CsvPaths_lis[1], index=False)
+        if ans == "n":
+            print("Skipping...")
+
+def StykkeThreeRunSave_func(CsvPaths_lis):
+    import numpy as np
+    import pandas as pd
+    from scipy.optimize import curve_fit
+
+    # Paths are set for each of the relevant datasets
+    CSVPath1_str = CsvPaths_lis[0]
+    CSVPath2_str = CsvPaths_lis[1]
+    CSVPath3_str = CsvPaths_lis[2]
+    CSVPath4_str = CsvPaths_lis[3]
+
+    # Dataframes 2 and 4 are read in to find moulds that are different between them.
+    df2 = pd.read_csv(CSVPath2_str)
+    df4 = pd.read_csv(CSVPath4_str)
+    # This mould difference tells us what we are currently interested in.
+    old_moulds = list(set(df4["mould_position"]))
+    all_moulds = list(set(df2["mould_position"]))
+    current_moulds = [x for x in all_moulds if x not in old_moulds]
+    # We then remove all rows in the dataframes pertaining to the old moulds
+    df1 = pd.read_csv(CSVPath1_str)
+    for _ in old_moulds:
+        df1 = df1[df1["mould_position"].str.contains(_)==False]
+    # We then remove all rows in the dataframes pertaining to the old moulds
+    df2 = pd.read_csv(CSVPath2_str)
+    for _ in old_moulds:
+        df2 = df2[df2["mould_position"].str.contains(_)==False]
+    # And reset the indexes
+    df1 = df1.reset_index(drop=True)
+    df2 = df2.reset_index(drop=True)
+
+    # Exponential function defined
+    def exp_func(x, a, b, c):
+        return a * np.exp(-b * x) + c
+
+    # Linear function defined
+    def lin_func(x, m, c):
+        return m * x + c
+
+    # Format the datetime correctly.
+    df2['datetime'] = pd.to_datetime(df2["datetime"], format='%Y-%m-%d %H:%M:%S')
+    df2
+    # Get time elapsed since start of measurements in hours
+    time_hours_arr = []
+    for i in df2['datetime']:
+        mould_pos = np.array(df2.loc[df2['datetime'] == i, 'mould_position'])[0]
+        earliest_time_idx_4_mould_pos = np.array(df2["mould_position"]).tolist().index(f"{mould_pos}")
+        time_hours_arr.append((i - df2.datetime[earliest_time_idx_4_mould_pos]).total_seconds() / 3600)
+    df2['time_hours'] = time_hours_arr
+
+    # Get mass in % of original mass
+    polymer_mass_pct_arr = []
+    for timestamp,mass in zip(df2['datetime'],df2['PolymerMass_g']):
+        mould_pos = np.array(df2.loc[df2['datetime'] == timestamp, 'mould_position'])[0]
+        earliest_time_idx_4_mould_pos = np.array(df2["mould_position"]).tolist().index(f"{mould_pos}")
+        polymer_mass_pct_arr.append((mass / df2.PolymerMass_g[earliest_time_idx_4_mould_pos]) * 100)
+    df2['polymer_mass_pct'] = polymer_mass_pct_arr
+
+    # Read in version so far of the stykke3 dataframe
+    df3 = pd.read_csv(CSVPath3_str)
+    # Drop all data and leave column headings
+    df3.drop(df3.index, inplace=True)
+    # Saving the dataframe as a CSV overwriting the original CSV read in.
+    df3.to_csv(CSVPath3_str, index=False)
+
+    # Iterate through the mould positions
+    for current_mould in df1['mould_position']:
+        # X and Y arrays for time and mass of polymer in the mould defined
+        x_full_arr = np.array(df2.loc[df2['mould_position'] == current_mould, 'time_hours'])
+        y_full_arr = np.array(df2.loc[df2['mould_position'] == current_mould, 'polymer_mass_pct'])
+        t_full_arr = np.array(df2.loc[df2['mould_position'] == current_mould, 'datetime'])
+    
+        # Empty arrays defined and to be filled with progressively more of the full datasets above as a part of the below loop.
+        x_arr = []
+        y_arr = []
+    
+        # Iterate through the cumulatively growing arrays considering different exponentials and develop df3
+        for count,(_,__,___) in enumerate(zip(x_full_arr,y_full_arr,t_full_arr)):
+            x_arr.append(_)
+            y_arr.append(__)
+            if count >= 2:
+                # Fit the exponential function to the data, a guess of parameters is made.
+                popt_exp, pcov_exp = curve_fit(exp_func, x_arr, y_arr, p0=[y_arr[0],np.log(2)/(x_arr[0]+x_arr[len(x_arr)-1]/2),y_arr[0]-1],maxfev=10000)
+                # Create the x's for the last 24 hours
+                x_last24exp_arr = np.linspace(x_arr[len(x_arr)-1]-24,(x_arr[len(x_arr)-1]),10)
+                # Estimate the last 24 hours of data using the exponential fitted
+                y_next24exp_arr = exp_func(x_last24exp_arr,popt_exp[0],popt_exp[1],popt_exp[2])
+                # Fit a linear function to the precast, m (% hr^-1) can then be obtained
+                popt_lin, pcov_lin = curve_fit(lin_func, x_last24exp_arr, y_next24exp_arr, p0=[((y_next24exp_arr[len(y_next24exp_arr)-1] - y_next24exp_arr[0])/(x_last24exp_arr[len(x_last24exp_arr)-1] - x_last24exp_arr[0])),80],maxfev=100000)
+                # Read in version so far of the dataframe
+                df3 = pd.read_csv(CSVPath3_str)
+                # Placing the newfound information into the dataframe we are dealing with
+                df3.loc[-1] = [current_mould,count+1,___,popt_exp[0],popt_exp[1],popt_exp[2],(round(_,2)),round(popt_lin[0],4),round(popt_lin[1],4)]
+                # Saving the dataframe as a CSV overwriting the original CSV read in.
+                df3.to_csv(CSVPath3_str, index=False)
+
+def PlotDashboard_func(CsvPaths_lis,width_sca,height_sca):
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    from scipy.optimize import curve_fit
+
+    # Paths are set for each of the relevant datasets
+    CSVPath1_str = CsvPaths_lis[0]
+    CSVPath2_str = CsvPaths_lis[1]
+    CSVPath3_str = CsvPaths_lis[2]
+    CSVPath4_str = CsvPaths_lis[3]
+
+    # Dataframes 2 and 4 are read in to find moulds that are different between them.
+    df2 = pd.read_csv(CSVPath2_str)
+    df4 = pd.read_csv(CSVPath4_str)
+    # This mould difference tells us what we are currently interested in.
+    old_moulds = list(set(df4["mould_position"]))
+    all_moulds = list(set(df2["mould_position"]))
+    current_moulds = [x for x in all_moulds if x not in old_moulds]
+    # We then remove all rows in the dataframes pertaining to the old moulds
+    df1 = pd.read_csv(CSVPath1_str)
+    for _ in old_moulds:
+        df1 = df1[df1["mould_position"].str.contains(_)==False]
+    # We then remove all rows in the dataframes pertaining to the old moulds
+    df2 = pd.read_csv(CSVPath2_str)
+    for _ in old_moulds:
+        df2 = df2[df2["mould_position"].str.contains(_)==False]
+    # And reset the indexes
+    df1 = df1.reset_index(drop=True)
+    df2 = df2.reset_index(drop=True)
+
+    # Read in the CSV3 as df3
+    df3 = pd.read_csv(CSVPath3_str)
+
+    # Exponential function defined
+    def exp_func(x, a, b, c):
+        return a * np.exp(-b * x) + c
+
+    # Linear function defined
+    def lin_func(x, m, c):
+        return m * x + c
+
+    # Format the datetime correctly.
+    df2['datetime'] = pd.to_datetime(df2["datetime"], format='%Y-%m-%d %H:%M:%S')
+    # Get time elapsed since start of measurements in hours
+    time_hours_arr = []
+    for i in df2['datetime']:
+        mould_pos = np.array(df2.loc[df2['datetime'] == i, 'mould_position'])[0]
+        earliest_time_idx_4_mould_pos = np.array(df2["mould_position"]).tolist().index(f"{mould_pos}")
+        time_hours_arr.append((i - df2.datetime[earliest_time_idx_4_mould_pos]).total_seconds() / 3600)
+    df2['time_hours'] = time_hours_arr
+
+    # Get mass in % of original mass
+    polymer_mass_pct_arr = []
+    for timestamp,mass in zip(df2['datetime'],df2['PolymerMass_g']):
+        mould_pos = np.array(df2.loc[df2['datetime'] == timestamp, 'mould_position'])[0]
+        earliest_time_idx_4_mould_pos = np.array(df2["mould_position"]).tolist().index(f"{mould_pos}")
+        polymer_mass_pct_arr.append((mass / df2.PolymerMass_g[earliest_time_idx_4_mould_pos]) * 100)
+    df2['polymer_mass_pct'] = polymer_mass_pct_arr
+
+    # Number of Moulds
+    NoM = len(df1["mould_position"])
+    plots_hi = int(np.ceil(NoM/2))
+    plots_wi = 2
+
+    # To make sure the plotting system still functions, we must assure a grid formation.
+    if plots_hi < 2:
+        plots_hi = 2
+
+    # Mould's Plots
+    plot_arr = []
+    for _ in range(plots_wi):
+        for __ in range(plots_hi):
+            plot_arr.append((__,_))
+
+    # Plot Setup
+    fig, axs = plt.subplots(plots_hi, plots_wi, sharex=True, sharey=True, constrained_layout=True)
+    fig.suptitle('Polymer Mass v Time')
+    fig.set_size_inches(width_sca, height_sca)
+    fig.supxlabel('Time (hours)')
+    fig.supylabel('Polymer Mass (%)')
+
+    for ax,_ in zip(plot_arr,df1["mould_position"]):
+        x_arr = np.array(df2.loc[df2['mould_position'] == _, 'time_hours'])
+        y_arr = np.array(df2.loc[df2['mould_position'] == _, 'polymer_mass_pct'])
+
+        exp_a_arr = np.array(df3.loc[df3['mould_position'] == _, 'exp_param_a'])
+        exp_b_arr = np.array(df3.loc[df3['mould_position'] == _, 'exp_param_b'])
+        exp_c_arr = np.array(df3.loc[df3['mould_position'] == _, 'exp_param_c'])
+
+        lin_m_arr = np.array(df3.loc[df3['mould_position'] == _, 'lin_param_m'])
+        lin_c_arr = np.array(df3.loc[df3['mould_position'] == _, 'lin_param_c'])
+
+        axs[ax].scatter(x_arr,y_arr,label=f"{_}")
+
+        x_exp_linspaced_arr = np.linspace(0,x_arr[len(x_arr)-1],100)
+        axs[ax].plot(x_exp_linspaced_arr, exp_func(x_exp_linspaced_arr, * [exp_a_arr[len(exp_a_arr)-1],exp_b_arr[len(exp_b_arr)-1],exp_c_arr[len(exp_c_arr)-1]]),label=f"$T_h$ = {round((np.log(2)/exp_b_arr[len(exp_b_arr)-1]),2)}, $T_h$'s = {round((x_arr[len(x_arr)-1])/(np.log(2)/exp_b_arr[len(exp_b_arr)-1]),2)}")
+
+        x_lin_linspaced_arr = np.linspace(x_arr[len(x_arr)-1]-24,x_arr[len(x_arr)-1],100)
+        axs[ax].plot(x_lin_linspaced_arr, lin_func(x_lin_linspaced_arr, * [lin_m_arr[len(lin_m_arr)-1],lin_c_arr[len(lin_c_arr)-1],]),label=f"$m_c$ = {lin_m_arr[len(lin_m_arr)-1]}")
+
+        # All the hours for sample
+        hours_arr = np.linspace(int(round(x_arr[0],0)),int(round(x_arr[len(x_arr)-1],0)),int(round(x_arr[len(x_arr)-1],0))+1)
+
+        for hour in hours_arr:
+            # Create the x's for the last 24 hours
+            x_last24exp_arr = np.linspace(hour-24,hour,100)
+            # Estimate the last 24 hours of data using the exponential fitted
+            y_last24exp_arr = exp_func(x_last24exp_arr,exp_a_arr[len(exp_a_arr)-1],exp_b_arr[len(exp_b_arr)-1],exp_c_arr[len(exp_c_arr)-1])
+            # Fit a linear function to the forecast, m (% hr^-1) can then be obtained
+            popt_lin, pcov_lin = curve_fit(lin_func, x_last24exp_arr, y_last24exp_arr, p0=[((y_last24exp_arr[len(y_last24exp_arr)-1] - y_last24exp_arr[0])/(x_last24exp_arr[len(x_last24exp_arr)-1] - x_last24exp_arr[0])),75])
+            if popt_lin[0] > -0.028:
+                t_final_int = hour
+                m_final_int = round(popt_lin[0],3)
+                m_pct_final_int = round(exp_func(hour,exp_a_arr[len(exp_a_arr)-1],exp_b_arr[len(exp_b_arr)-1],exp_c_arr[len(exp_c_arr)-1]),2)
+                axs[ax].plot(x_last24exp_arr,y_last24exp_arr,label=f"$m_f$ = {m_final_int}")
+                break
+            else:
+                t_final_int = 0
+                m_final_int = 0
+                m_pct_final_int = 0
+
+        axs[ax].axvline(t_final_int, c="green", label=f"$t_f$ = {t_final_int} hrs, $mass_f$ = {m_pct_final_int}%")
+
+        axs[ax].legend(loc="upper right")
+
+def PlotOverview_func(CsvPaths_lis,width_sca, height_sca):
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+
+    # Paths are set for each of the relevant datasets
+    CSVPath1_str = CsvPaths_lis[0]
+    CSVPath2_str = CsvPaths_lis[1]
+    CSVPath4_str = CsvPaths_lis[3]
+
+    # Dataframes 2 and 4 are read in to find moulds that are different between them.
+    df2 = pd.read_csv(CSVPath2_str)
+    df4 = pd.read_csv(CSVPath4_str)
+    # This mould difference tells us what we are currently interested in.
+    old_moulds = list(set(df4["mould_position"]))
+    all_moulds = list(set(df2["mould_position"]))
+    current_moulds = [x for x in all_moulds if x not in old_moulds]
+    # We then remove all rows in the dataframes pertaining to the old moulds
+    df1 = pd.read_csv(CSVPath1_str)
+    for _ in old_moulds:
+        df1 = df1[df1["mould_position"].str.contains(_)==False]
+    # We then remove all rows in the dataframes pertaining to the old moulds
+    df2 = pd.read_csv(CSVPath2_str)
+    for _ in old_moulds:
+        df2 = df2[df2["mould_position"].str.contains(_)==False]
+    # And reset the indexes
+    df1 = df1.reset_index(drop=True)
+    df2 = df2.reset_index(drop=True)
+
+    # Format the datetime correctly.
+    df2['datetime'] = pd.to_datetime(df2["datetime"], format='%Y-%m-%d %H:%M:%S')
+    # Get time elapsed since start of measurements in hours
+    time_hours_arr = []
+    for i in df2['datetime']:
+        mould_pos = np.array(df2.loc[df2['datetime'] == i, 'mould_position'])[0]
+        earliest_time_idx_4_mould_pos = np.array(df2["mould_position"]).tolist().index(f"{mould_pos}")
+        time_hours_arr.append((i - df2.datetime[earliest_time_idx_4_mould_pos]).total_seconds() / 3600)
+    df2['time_hours'] = time_hours_arr
+    # Drop any irrelevant columns
+    df2.drop(["datetime", "MouldPolymerMass_g", "MouldMass_g"], axis=1, inplace=True)
+    # Generate a column of polymer mass loss in % rather than g
+    df2["polymer_mass_%"] = df2["PolymerMass_g"]
+
+    fig = plt.gcf()
+    fig.set_size_inches(width_sca, height_sca)
+
+    # Loop through the fresh dataframes to generate a plot of mass loss over time in %
+    for _,__ in zip(df1["mould_position"], df1["PolymerMass_g"]):
+        alt_df = df2.loc[df2['mould_position'] == _]
+        alt_df["polymer_mass_%"] = (alt_df["PolymerMass_g"] / __) * 100
+        x_arr = alt_df["time_hours"]
+        y_arr = alt_df["polymer_mass_%"]
+        plt.plot(x_arr,y_arr,label=f"{_}")
+        plt.legend()
+
+    plt.xlabel("Time (hours)")
+    plt.ylabel("Polymer Mass (%)")
+
+def StykkeFourRunSave_func(chem_lis,CsvPaths_lis,dims_lis):
+    """
+    Function for saving the end results of an experiment thus far after stykke 3 has been run
+    and it has been manually evaluated that all the moulds in this run have been completed.
+
+    This function takes:
+        chem_lis = list, chemical objects being used in this experiment
+        CsvPaths_lis = list, csv path strings being used in this experiment
+        dims_lis = list, bayesian dimension objects being used in this experiment
+
+    This function does not return any variables but does locate the local
+    stykke 4 csv and place the required information into it.
+    """
+    import pandas as pd
+    import numpy as np
+    from scipy.optimize import curve_fit
+
+    # Path of the CSV file for Stykke-1
+    CSVPath1_str = CsvPaths_lis[0]
+    # Path of the CSV file for Stykke-2
+    CSVPath2_str = CsvPaths_lis[1]
+    # Path of the CSV file for Stykke-3
+    CSVPath3_str = CsvPaths_lis[2]
+    # Path of the CSV file for Stykke-4
+    CSVPath4_str = CsvPaths_lis[3]
+
+    # Dataframes 2 and 4 are read in to find moulds that are different between them.
+    df2 = pd.read_csv(CSVPath2_str)
+    df4 = pd.read_csv(CSVPath4_str)
+    # This mould difference tells us what we are currently interested in.
+    OldMoulds_lis = list(set(df4["mould_position"]))
+    AllMoulds_lis = list(set(df2["mould_position"]))
+    CurrentMoulds_lis = [x for x in AllMoulds_lis if x not in OldMoulds_lis]
+    # We then remove all rows in the dataframes pertaining to the old moulds
+    df1 = pd.read_csv(CSVPath1_str)
+    for _ in OldMoulds_lis:
+        df1 = df1[df1["mould_position"].str.contains(_)==False]
+    # We then remove all rows in the dataframes pertaining to the old moulds
+    df2 = pd.read_csv(CSVPath2_str)
+    for _ in OldMoulds_lis:
+        df2 = df2[df2["mould_position"].str.contains(_)==False]
+    # And reset the indexes
+    df1 = df1.reset_index(drop=True)
+    df2 = df2.reset_index(drop=True)
+
+    # Read in the CSV3 as df3
+    df3 = pd.read_csv(CSVPath3_str)
+
+    # Exponential function defined
+    def exp_func(x, a, b, c):
+        return a * np.exp(-b * x) + c
+
+    # Linear function defined
+    def lin_func(x, m, c):
+        return m * x + c
+
+    # Values brought together and placed in final csv
+    for mould in df1["mould_position"]:
+        a_arr = np.array(df3.loc[df3['mould_position'] == mould, 'exp_param_a'])
+        b_arr = np.array(df3.loc[df3['mould_position'] == mould, 'exp_param_b'])
+        c_arr = np.array(df3.loc[df3['mould_position'] == mould, 'exp_param_c'])
+        t_elapsed_arr = np.array(df3.loc[df3['mould_position'] == mould, 'time_elapsed_hours'])
+        a_sca = a_arr[len(a_arr)-1]
+        b_sca = b_arr[len(b_arr)-1]
+        c_sca = c_arr[len(c_arr)-1]
+        t_elapsed_sca = t_elapsed_arr[len(t_elapsed_arr)-1]
+        hours_arr = np.linspace(0,int(t_elapsed_sca),int(t_elapsed_sca)+1)
+
+        for hour in hours_arr:
+            # Create the x's for the last 24 hours
+            x_last24exp_arr = np.linspace(hour-24,hour,100)
+            # Estimate the last 24 hours of data using the exponential fitted
+            y_last24exp_arr = exp_func(x_last24exp_arr,a_sca,b_sca,c_sca)
+            # Fit a linear function to the forecast, m (% hr^-1) can then be obtained
+            popt_lin, pcov_lin = curve_fit(lin_func, x_last24exp_arr, y_last24exp_arr, p0=[((y_last24exp_arr[len(y_last24exp_arr)-1] - y_last24exp_arr[0])/(x_last24exp_arr[len(x_last24exp_arr)-1] - x_last24exp_arr[0])),75])
+            if popt_lin[0] > -0.028:
+                t_final_int = hour
+                m_final_int = round(popt_lin[0],3)
+                m_pct_final_int = exp_func(hour,a_sca,b_sca,c_sca)
+                break
+            else:
+                t_final_int = 0
+                m_final_int = 0
+                m_pct_final_int = 0
+
+        # Getting a list of all the bayesian parameters values from df1
+        BayesParam_lis = []
+        for dim_obj in dims_lis:
+            if dim_obj.name[0] == "s":
+                header_str = f"{dim_obj.name}"
+            else:
+                header_str = f"b{dim_obj.name[1]}"
+            VarName_str = f"{header_str}_sca"
+            VarVal_sca = np.array(df1.loc[df1['mould_position'] == mould, header_str])[0]
+            globals()[VarName_str] = VarVal_sca
+            BayesParam_lis.append(globals()[VarName_str])
+
+        # Getting a list of all the chemicals' stoichiometries from df1
+        ChemStoich_lis = []
+        for chem_obj in chem_lis:
+            header_str = f"{chem_obj.abbrev_name}_stoichiometry"
+            VarName_str = f"{chem_obj.abbrev_name}Stoich_sca"
+            VarVal_sca = np.array(df1.loc[df1['mould_position'] == mould, header_str])[0]
+            globals()[VarName_str] = VarVal_sca
+            ChemStoich_lis.append(globals()[VarName_str])
+
+        # Getting the values for moulds' mass losses etc
+        StartMass_g_sca = np.array(df1.loc[df1['mould_position'] == mould, 'PolymerMass_g'])[0]
+        EndMass_pct_sca = m_pct_final_int
+        DeltaMassLoss_pct_sca = -1 * (100 - m_pct_final_int)
+
+        # Compiling all the 'gotten' information from above into a final array that can be saved to df4's csv
+        final_lis = []
+        final_lis.append(mould)
+        for BayesParam_sca in BayesParam_lis:
+            final_lis.append(BayesParam_sca)
+        for ChemStoich_sca in ChemStoich_lis:
+            final_lis.append(ChemStoich_sca)
+        final_lis.append(StartMass_g_sca)
+        final_lis.append(EndMass_pct_sca)
+        final_lis.append(DeltaMassLoss_pct_sca)
+
+        # Read in version so far of the dataframe
+        df4 = pd.read_csv(CSVPath4_str)
+        # Placing the newfound information into the dataframe we are dealing with
+        df4.loc[-1] = final_lis
+        # Saving the dataframe as a CSV overwriting the original CSV read in.
+        df4.to_csv(CSVPath4_str, index=False)
+
 class ExperimentalMethods(object):
     def __init__(self):
         self.name = "Experimental Methods"
         self.setup = self.setup()
         self.stykke1 = self.stykke1()
+        self.stykke2 = self.stykke2()
+        self.stykke3 = self.stykke3()
+        self.stykke4 = self.stykke4()
     def show(self):
         print("Outer class - simplex samplers")
         print("Name:", self.name)
@@ -348,9 +810,6 @@ class ExperimentalMethods(object):
     class stykke1():
         def __init__(self):
             self.name = "Stykke 1"
-        def show(self):
-            print("Inner class - Stykke 1")
-            print("Name:", self.name)
         def run(self,arg1,arg2,arg3,arg4):
             MPs_lis,MoSMs_lis,MoSMPP_lis,MoPP_lis,ToPP_lis = StykkeOneRun_func(arg1,arg2,arg3,arg4)
             return MPs_lis,MoSMs_lis,MoSMPP_lis,MoPP_lis,ToPP_lis
@@ -358,3 +817,25 @@ class ExperimentalMethods(object):
             StykkeOneShow_func(arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9)
         def save(self,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10):
             StykkeOneSave_func(arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10)
+
+    class stykke2():
+        def __init__(self):
+            self.name = "Stykke 2"
+        def runsave(self,arg1):
+            StykkeTwoRunSave_func(arg1)
+    
+    class stykke3():
+        def __init__(self):
+            self.name = "Stykke 3"
+        def runsave(self,arg1):
+            StykkeThreeRunSave_func(arg1)
+        def plotdash(self,arg1,arg2,arg3):
+            PlotDashboard_func(arg1,arg2,arg3)
+        def plotoverview(self,arg1,arg2,arg3):
+            PlotOverview_func(arg1,arg2,arg3)
+
+    class stykke4():
+        def __init__(self):
+            self.name = "Stykke 4"
+        def runsave(self,arg1,arg2,arg3):
+            StykkeFourRunSave_func(arg1,arg2,arg3)
