@@ -44,7 +44,7 @@ When one of these subdirectories are opened files governing the sequential optim
 Alternative to the directories and files associated with the "SequentialExamples" directory, there also exists an example of space-filling sampling using the BO4BT package, this example has the subdirectory "QuasirandomExample" since it shows off a quasirandom space-filling sampling technique called Sobol sampling, and it's subdirectory is called:
 * "PGCiIt-QR-27-S2B1T1", An optimisation experiment for poly(glycerol citrate itaconate) (P(GCiIt)) with a Space-filling Quasirandom (QR) Sampling format based on the Sobol sampling technique, 27 samples are generated across the parameter space (27), and there are two strength predictor variables and one balancing predictor variable being optimised in regard to a single target variable (S2B1T1).
 
-## Overview
+## Directory Tree
 ```
 ├── BO4BT-Packages
 │   ├── BO4BT-Package_Ax
