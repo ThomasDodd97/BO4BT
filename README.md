@@ -1,2 +1,28 @@
 # BO4BT
-This repository complements the Bayesian Optimisation for Biodegradable Thermosets (BO4BT) project being developed at The Materials Science and Metallurgy Department of the University of Cambridge.
+This repository complements the Bayesian Optimisation for Biodegradable Thermosets (BO4BT) project developed at The Materials Science and Metallurgy Department of the University of Cambridge. This repository is the culmination of a year's work on optimising extent of polymerisation in biodegradable polyester thermosets. The thesis developed alongside this code will be published here once complete.
+
+## "BO4BT-Packages" Directory
+This directory contains two python packages:
+* "BO4BT-Package_Ax", developed to be run alongside Ax.
+* "BO4BT-Package_scikit-optimize", developed to be run alongside scikit-learn.
+
+The BO4BT package is split in two, so that it can be used alongside two different packages which can run Bayesian optimisation. Both are opensource on GitHub- one is named [scikit-optimize](https://scikit-optimize.github.io/stable/#), and the other is called [Ax](https://github.com/facebook/Ax).
+
+ The BO4BT package brings together four python module files which were developed for a part-computational part-laboratory based optimisation of properties in thermoset biodegradable plastics:
+* "ExperimentalMethods.py", a script containing functions useful for automating practical laboratory components of the workflow, these are unified by a class called ExperimentalMethods.
+* "Miscellaneous.py", a script with extra functions and classes necessary for the workflow developed.
+* "SimplexSampler.py", a script containing functions for the representative sampling of parameter spaces in multiple dimensions, as well as balancing between verious parameters. All the techniques are unified by the class called SimplexSampler.
+* "StoichiometryConverter.py", a script which provides interconversion functionality when predictor variables need to be converted to stoichiometries for experimental work.
+
+## "CondaEnvironments" Directory
+This directory contains two different conda environments described in a .yml format. These environments can be imported to a local version of conda, so that the example scripts being carried out in the jupyter notebooks within this repository can be run.
+* "env_Ax.yml", conda environment for running Bayesian optimisation experiments using the Ax package.
+* "env.scikit-optimize.yml", conda environment for running Bayesian optimisation experiments using the scikit-optimize package.
+
+## "OptimisationExamples" Directory
+This directory contains two different example case directories:
+* "SequentialExamples", this directory deals with how sequential optimisation techniques (i.e. Bayesian optimisation) were applied.
+* "SpaceFillingExamples", this directory deals with how space-filling techniqes (e.g. Sobol sampling) were applied.
+
+The split between space-filling and sequential is important, as both are necessary for successful sequential optimisation, but are implemented in seperate scripts.
+
