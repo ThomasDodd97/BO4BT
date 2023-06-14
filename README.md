@@ -1,6 +1,69 @@
 # BO4BT
 This repository complements the Bayesian Optimisation for Biodegradable Thermosets (BO4BT) project developed at The Materials Science and Metallurgy Department of the University of Cambridge. This repository is the culmination of a year's work on optimising extent of polymerisation in biodegradable polyester thermosets. The thesis developed alongside this code will be published here once complete.
 
+├── BO4BT-Packages
+│   ├── BO4BT-Package_Ax
+│   │   ├── ExperimentalMethods.py
+│   │   ├── Miscellaneous.py
+│   │   ├── SimplexSampler.py
+│   │   ├── StoichiometryConverter.py
+│   │   ├── __init__.py
+│   │   └── __pycache__
+│   │       ├── ExperimentalMethods.cpython-310.pyc
+│   │       ├── ExperimentalMethods.cpython-311.pyc
+│   │       ├── Miscellaneous.cpython-310.pyc
+│   │       ├── Miscellaneous.cpython-311.pyc
+│   │       ├── SimplexSampler.cpython-310.pyc
+│   │       ├── SimplexSampler.cpython-311.pyc
+│   │       ├── StoichiometryConverter.cpython-310.pyc
+│   │       ├── StoichiometryConverter.cpython-311.pyc
+│   │       └── __init__.cpython-310.pyc
+│   └── BO4BT-Package_scikit-optimize
+│       ├── ExperimentalMethods.py
+│       ├── Miscellaneous.py
+│       ├── SimplexSampler.py
+│       ├── StoichiometryConverter.py
+│       ├── __init__.py
+│       └── __pycache__
+│           ├── ExperimentalMethods.cpython-310.pyc
+│           ├── ExperimentalMethods.cpython-311.pyc
+│           ├── Miscellaneous.cpython-310.pyc
+│           ├── Miscellaneous.cpython-311.pyc
+│           ├── SimplexSampler.cpython-310.pyc
+│           ├── SimplexSampler.cpython-311.pyc
+│           ├── StoichiometryConverter.cpython-310.pyc
+│           ├── StoichiometryConverter.cpython-311.pyc
+│           └── __init__.cpython-310.pyc
+├── CondaEnvironments
+│   ├── env_Ax.yml
+│   └── env_scikit-optimize.yml
+├── OptimisationExamples
+│   ├── SequentialExamples
+│   │   ├── OptimisationExample_Ax
+│   │   │   └── PGCiIt-BOpt-9,27,1-S2B1T1
+│   │   │       ├── experiment.json
+│   │   │       ├── program.ipynb
+│   │   │       ├── raw-data_Stykke1.csv
+│   │   │       ├── raw-data_Stykke2.csv
+│   │   │       ├── raw-data_Stykke3.csv
+│   │   │       └── raw-data_Stykke4.csv
+│   │   └── OptimisationExample_scikit-optimize
+│   │       └── PGCiIt-BOpt-9,27,1-S2B1T1
+│   │           ├── program.ipynb
+│   │           ├── raw-data_Stykke1.csv
+│   │           ├── raw-data_Stykke2.csv
+│   │           ├── raw-data_Stykke3.csv
+│   │           └── raw-data_Stykke4.csv
+│   └── SpaceFillingExamples
+│       └── QuasirandomExample
+│           └── PGCiIt-QR-27-S2B1T1
+│               ├── program.ipynb
+│               ├── raw-data_Stykke1.csv
+│               ├── raw-data_Stykke2.csv
+│               ├── raw-data_Stykke3.csv
+│               └── raw-data_Stykke4.csv
+└── README.md
+
 ## "BO4BT-Packages" Directory
 This directory contains two python packages:
 * "BO4BT-Package_Ax", developed to be run alongside Ax.
