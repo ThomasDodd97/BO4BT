@@ -1,5 +1,5 @@
 # BO4BT
-This repository complements the Bayesian Optimisation for Biodegradable Thermosets (BO4BT) project developed at The Materials Science and Metallurgy Department of the University of Cambridge. This repository is the culmination of a year's work on optimising extent of polymerisation in biodegradable polyester thermosets. The thesis developed alongside this code will be published here once complete.
+This repository complements the Bayesian Optimisation for Biodegradable Thermosets (BO4BT) project developed at The Materials Science and Metallurgy Department of the University of Cambridge. This repository is the culmination of a year's work on optimising extent of polymerisation in biodegradable polyester thermosets. The report developed alongside this code has been published here now the project has reached its end.
 
 ## "BO4BT-Packages" Directory
 This directory contains two python packages:
@@ -107,6 +107,7 @@ Alternative to the directories and files associated with the "SequentialExamples
 │               ├── raw-data_Stykke2.csv
 │               ├── raw-data_Stykke3.csv
 │               └── raw-data_Stykke4.csv
-└── README.md
+├── README.md
+└── Report.pdf
 ```
 
